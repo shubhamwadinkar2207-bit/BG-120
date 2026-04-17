@@ -332,6 +332,18 @@ User → Write Code → `POST /api/run-code` → Execution → Result
 
 ---
 
+## 🔧 Firebase Setup
+
+This project uses Firebase Authentication and Firestore for login/signup functionality.
+
+1. Copy `firebase-config.example.js` to `firebase-config.js`.
+2. Replace the placeholder values with your Firebase web app configuration.
+3. Keep `firebase-config.js` local and do not commit it to Git.
+
+The project already includes `.gitignore` to exclude `firebase-config.js`.
+
+---
+
 ## ⚠️ Limitations (Initial Version)
 
 * Static UI in early stages

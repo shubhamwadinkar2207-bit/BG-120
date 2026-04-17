@@ -1,5 +1,8 @@
 // Copy this file to firebase-config.js and replace the placeholder values.
 // firebase-config.js is ignored by git so your real key stays out of the repo.
+//
+// If you deploy to GitHub Pages or another hosted domain, add that domain to
+// Firebase Authentication Authorized Domains before Google login will work.
 
 export const firebaseConfig = {
   apiKey: "YOUR_FIREBASE_API_KEY",

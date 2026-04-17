@@ -390,6 +390,16 @@ This project uses Firebase Authentication and Firestore for login/signup functio
 
 The project already includes `.gitignore` to exclude `firebase-config.js`.
 
+### Deploying on GitHub Pages or another hosted domain
+
+* The file `firebase-config.js` is intentionally ignored and is not stored in the public repo.
+* For Google login to work on a hosted domain, you must add that domain to Firebase Authentication authorized domains.
+* Example domains to add in Firebase:
+  * `localhost`
+  * `https://<your-github-username>.github.io`
+  * `https://<your-custom-domain>`
+* If the hosted domain is not authorized in Firebase, Google sign-in will fail even if it works locally.
+
 ---
 
 ## ⚠️ Limitations (Initial Version)

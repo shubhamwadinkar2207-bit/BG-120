@@ -992,13 +992,95 @@ function initContestsPage() {
   }, 60000);
 }
 
-window.registerContest = (id) => {
-  // TODO: POST /api/contests/:id/register
-  alert(`Registered for contest #${id}! (Connect to backend to persist)`);
-};
-window.enterContest = (id) => {
-  alert(`Entering contest #${id}! (Backend needed for contest problems)`);
-};
+function closeContestModal() {
+  const existing = document.getElementById('contest-entry-modal');
+  if (existing) existing.remove();
+}
+
+function showContestEntryForm(contestId, mode = 'Enter') {
+  if (!currentUser) {
+    alert('Please log in to continue.');
+    window.location.href = 'login.html';
+    return;
+  }
+
+  closeContestModal();
+
+  const modal = document.createElement('div');
+  modal.id = 'contest-entry-modal';
+  modal.className = 'modal-backdrop';
+  modal.innerHTML = `
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <div class="modal-tag">${mode} Contest</div>
+          <h3>Contest #${contestId}</h3>
+        </div>
+        <button type="button" class="modal-close">×</button>
+      </div>
+      <p class="modal-description">Please enter your name and contact number to ${mode.toLowerCase()} this contest.</p>
+      <form class="contest-entry-form">
+        <label class="modal-label">Name
+          <input name="participantName" type="text" placeholder="Your full name" required />
+        </label>
+        <label class="modal-label">Contact No.
+          <input name="participantPhone" type="tel" placeholder="+91 98765 43210" required />
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost modal-close">Cancel</button>
+          <button type="submit" class="btn btn-primary">Submit</button>
+        </div>
+        <div class="modal-error" aria-live="polite"></div>
+      </form>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const closeButtons = modal.querySelectorAll('.modal-close');
+  closeButtons.forEach(btn => btn.addEventListener('click', closeContestModal));
+
+  const form = modal.querySelector('.contest-entry-form');
+  const errorEl = modal.querySelector('.modal-error');
+  const nameInput = form.querySelector('[name="participantName"]');
+  const phoneInput = form.querySelector('[name="participantPhone"]');
+
+  nameInput.value = currentUser.displayName || currentUser.email.split('@')[0] || '';
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const name = nameInput.value.trim();
+    const phone = phoneInput.value.trim();
+
+    if (!name) {
+      errorEl.textContent = 'Name is required.';
+      return;
+    }
+    if (!phone) {
+      errorEl.textContent = 'Contact number is required.';
+      return;
+    }
+
+    localStorage.setItem(`contest-entry-${contestId}`, JSON.stringify({
+      contestId,
+      mode,
+      name,
+      phone,
+      submittedAt: new Date().toISOString()
+    }));
+
+    alert(`${mode} request sent for contest #${contestId}.`);
+    closeContestModal();
+  });
+}
+
+function registerContest(contestId) {
+  showContestEntryForm(contestId, 'Register');
+}
+
+function enterContest(contestId) {
+  showContestEntryForm(contestId, 'Enter');
+}
 
 // ===== DASHBOARD =====
 function initDashboard() {

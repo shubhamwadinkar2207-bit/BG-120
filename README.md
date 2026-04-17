@@ -259,6 +259,42 @@ User → Write Code → `POST /api/run-code` → Execution → Result
 
 ### API
 
+---
+
+## 🔐 Firebase Setup & Secure Configuration
+
+This project uses Firebase for authentication and data storage. The private Firebase config is kept out of source control.
+
+### Steps to secure your Firebase key
+
+1. Copy `firebase-config.example.js` to `firebase-config.js`.
+2. Replace the placeholder values with your Firebase project settings.
+3. Keep `firebase-config.js` local and do not commit it.
+
+### Example file structure
+
+- `firebase-config.example.js` — safe template in repository
+- `firebase-config.js` — local config file ignored by Git
+
+### Why this is secure
+
+* `firebase-config.js` is listed in `.gitignore`
+* This keeps API keys and project IDs out of the public repo
+* The app still works locally when the local config file exists
+
+### Local setup
+
+1. Install or use a local static server.
+2. Run the app from the project root.
+3. Ensure `firebase-config.js` is created before opening the site.
+
+---
+
+## 📦 Deployment
+
+Push your code to GitHub after adding `firebase-config.js` locally. The repo should not include any sensitive Firebase credentials.
+
+
 * `POST /api/ai/hint`
 
 ---

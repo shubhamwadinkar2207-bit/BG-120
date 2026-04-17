@@ -44,7 +44,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, createUserWithEmailAndPassword, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, serverTimestamp, collection, query, where, orderBy, limit as limitFn, getDocs } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, updateDoc, getDoc, serverTimestamp, increment, collection, query, where, orderBy, limit as limitFn, getDocs } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 import { getUserProfile, getUserStats, getRecentSubmissions, getLeaderboard, setFirestore } from './firestore-utils.js';
 
 let auth = null;
@@ -117,7 +117,9 @@ async function handleSignupSubmit(event) {
     await setDoc(doc(db, 'users', cred.user.uid), {
       username,
       email,
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      followersCount: 0,
+      displayName: username
     });
     showAuthMessage('signup-msg', 'Account created! Redirecting…', true);
     window.location.href = 'dashboard.html';
@@ -135,10 +137,12 @@ async function handleGoogleSignIn() {
     const user = result.user;
     await setDoc(doc(db, 'users', user.uid), {
       username: user.displayName || user.email.split('@')[0],
+      displayName: user.displayName || user.email.split('@')[0],
       email: user.email,
       provider: 'google',
       lastLogin: serverTimestamp(),
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      followersCount: 0
     }, { merge: true });
     window.location.href = 'dashboard.html';
   } catch (error) {
@@ -359,6 +363,30 @@ function setupNavigationButtons() {
 /**
  * Setup profile page buttons (Edit Profile, Follow)
  */
+const FOLLOW_STORAGE_KEY = 'codearena-followed-users';
+
+function getFollowedUserIds() {
+  try {
+    return JSON.parse(localStorage.getItem(FOLLOW_STORAGE_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function isFollowing(userId) {
+  return getFollowedUserIds().includes(userId);
+}
+
+function setFollowingState(userId, following) {
+  const follows = new Set(getFollowedUserIds());
+  if (following) {
+    follows.add(userId);
+  } else {
+    follows.delete(userId);
+  }
+  localStorage.setItem(FOLLOW_STORAGE_KEY, JSON.stringify([...follows]));
+}
+
 function setupProfileButtons() {
   // Find buttons by text content since they don't have IDs
   const buttons = document.querySelectorAll('.profile-info-card button');
@@ -367,13 +395,55 @@ function setupProfileButtons() {
       btn.addEventListener('click', editProfile);
     } else if (btn.textContent.includes('Follow')) {
       btn.addEventListener('click', (e) => {
-        // Get the username from profile page title
-        const usernameEl = document.querySelector('.profile-info-card h1');
-        const username = usernameEl ? usernameEl.textContent.trim() : 'unknown';
-        followUser(username);
+        followUser(currentUser?.uid, e.currentTarget);
       });
     }
   });
+}
+
+async function loadProfilePageData() {
+  if (!currentUser || !window.location.pathname.endsWith('profile.html')) return;
+
+  try {
+    const profile = await getUserProfile(currentUser.uid) || {};
+    const username = profile.username || currentUser.displayName || currentUser.email.split('@')[0];
+    const displayName = profile.displayName || currentUser.displayName || currentUser.email;
+    const followersCount = profile.followersCount || 0;
+
+    const titleEl = document.querySelector('.profile-info-card h1');
+    const nameEl = document.querySelector('.profile-info-card p');
+    const avatarEl = document.querySelector('.profile-avatar-xl');
+    const descriptionEl = document.querySelector('.profile-info-card p:nth-of-type(2)');
+
+    if (titleEl) titleEl.textContent = username;
+    if (nameEl) nameEl.textContent = displayName;
+    if (avatarEl) {
+      const initials = username.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase();
+      avatarEl.textContent = initials || 'U';
+    }
+
+    let followerEl = document.getElementById('profile-followers-count');
+    if (!followerEl) {
+      followerEl = document.createElement('div');
+      followerEl.id = 'profile-followers-count';
+      followerEl.style.fontSize = '0.85rem';
+      followerEl.style.color = 'var(--text-muted)';
+      followerEl.style.marginTop = '0.4rem';
+      if (descriptionEl) {
+        descriptionEl.parentNode.insertBefore(followerEl, descriptionEl);
+      } else if (nameEl) {
+        nameEl.parentNode.insertBefore(followerEl, nameEl.nextSibling);
+      }
+    }
+    followerEl.textContent = `${followersCount} follower${followersCount === 1 ? '' : 's'}`;
+
+    const followBtn = document.querySelector('.profile-info-card button.btn-primary');
+    if (followBtn) {
+      followBtn.textContent = isFollowing(currentUser.uid) ? 'Following' : 'Follow';
+    }
+  } catch (error) {
+    console.error('Error loading profile page data:', error);
+  }
 }
 
 function renderNavbar(container) {
@@ -434,6 +504,9 @@ async function setupAuth() {
     if (user) {
       await loadDashboardData();
       await loadLeaderboardData();
+      if (window.location.pathname.endsWith('profile.html')) {
+        await loadProfilePageData();
+      }
     }
   });
 
@@ -1044,23 +1117,28 @@ function navigate(page) {
 /**
  * Edit user profile
  */
-function editProfile() {
+async function editProfile() {
   if (!currentUser) {
     alert('Please log in first');
     window.location.href = 'login.html';
     return;
   }
-  // Show profile edit options
+
   const newName = prompt('Enter your name:', currentUser.displayName || currentUser.email);
   if (newName && newName.trim()) {
+    const trimmedName = newName.trim();
     const auth = getAuth();
-    if (auth.currentUser) {
-      updateProfile(auth.currentUser, { displayName: newName.trim() })
-        .then(() => {
-          alert('Profile updated successfully');
-          location.reload();
-        })
-        .catch(err => alert('Error updating profile: ' + err.message));
+    const updates = { username: trimmedName, displayName: trimmedName };
+
+    try {
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { displayName: trimmedName });
+      }
+      await setDoc(doc(db, 'users', currentUser.uid), updates, { merge: true });
+      alert('Profile updated successfully');
+      await loadProfilePageData();
+    } catch (err) {
+      alert('Error updating profile: ' + err.message);
     }
   }
 }
@@ -1068,30 +1146,30 @@ function editProfile() {
 /**
  * Follow/unfollow a user
  */
-function followUser(userId) {
+async function followUser(userId, button) {
   if (!currentUser) {
     alert('Please log in first');
     window.location.href = 'login.html';
     return;
   }
 
-  // Get current user's follows from localStorage
-  const follows = JSON.parse(localStorage.getItem('userFollows') || '[]');
-  const followBtn = event.target;
-  
-  if (follows.includes(userId)) {
-    // Unfollow
-    follows.splice(follows.indexOf(userId), 1);
-    followBtn.textContent = 'Follow';
-    followBtn.classList.remove('followed');
-  } else {
-    // Follow
-    follows.push(userId);
-    followBtn.textContent = 'Following';
-    followBtn.classList.add('followed');
+  const targetUserId = userId || currentUser.uid;
+  const currentlyFollowing = isFollowing(targetUserId);
+  const followButton = button || document.querySelector('.profile-info-card button.btn-primary');
+
+  try {
+    await updateDoc(doc(db, 'users', targetUserId), {
+      followersCount: increment(currentlyFollowing ? -1 : 1)
+    });
+
+    setFollowingState(targetUserId, !currentlyFollowing);
+    if (followButton) {
+      followButton.textContent = currentlyFollowing ? 'Follow' : 'Following';
+    }
+    await loadProfilePageData();
+  } catch (err) {
+    alert('Unable to update follow status: ' + err.message);
   }
-  
-  localStorage.setItem('userFollows', JSON.stringify(follows));
 }
 
 /**
@@ -1175,5 +1253,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (currentUser) {
     if (page === 'dashboard.html') await loadDashboardData();
     if (page === 'leaderboard.html') await loadLeaderboardData();
+    if (page === 'profile.html') await loadProfilePageData();
   }
 });

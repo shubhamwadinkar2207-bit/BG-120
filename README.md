@@ -348,6 +348,18 @@ Push your code to GitHub after adding `firebase-config.js` locally. The repo sho
 
 ---
 
+## 🤝 AI Tools Used
+
+This project was developed with the help of AI tools to speed up implementation and improve code quality:
+
+* **ChatGPT** for design guidance and coding support
+* **VS Code AI** for intelligent code suggestions
+* **GitHub Copilot** for faster JavaScript and README writing
+
+These tools were used to accelerate development while keeping the final code and architecture under manual review.
+
+---
+
 ## 📁 Project Structure
 
 ```
